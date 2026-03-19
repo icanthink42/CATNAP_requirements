@@ -4,6 +4,11 @@ Coupled Adiabatic Tank and Nozzle Analysis Program - A multiphase flow and regen
 CATNAP couples an iterative control volume solver with multiphase flow functions, regenerative cooling functions, and NASA CEA combustion analysis to form a high fidelity estimate of propulsion system characteristics over the course of a burn. Generally, it is meant to be used
 for Nitrous Oxide (N2O) and a generic fuel (Ethanol, IPA, Jet-A). 
 
+Install Dependancies with:
+```sh
+pip install -r requirements.txt
+```
+
 Required inputs:
 -Geometry: engine, cooling channels, and injector
 -Propellants (CEA_obj class input used in combustion and transport analysis)
