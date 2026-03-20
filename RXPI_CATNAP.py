@@ -38,8 +38,15 @@ import math
 from math import pi, tan
 from scipy.optimize import brentq
 from scipy.optimize import root
+import tomllib
+from pathlib import Path
 
 from numba import njit
+
+#### LOAD CONFIGURATION ####
+config_path = Path(__file__).parent / "config.toml"
+with open(config_path, "rb") as f:
+    cfg = tomllib.load(f)
 
 #### CATNAP functions
 from RXPI_CATNAP_Fluids import mdot_spi_hem_nhne, mdot_vapor_orifice, nozzle, Injector_obj
@@ -54,77 +61,82 @@ plt.style.use('dark_background')
 
 ######### FEED SYSTEM INPUTS ############
 
-Ethoxide = Props_obj('N2O','ETHANOL','N2O','ETHANOL')
+Ethoxide = Props_obj(cfg['propellants']['oxidizer'], cfg['propellants']['fuel'],
+                     cfg['propellants']['oxidizer'], cfg['propellants']['fuel'])
 
-Pintle = Injector_obj(0.65,0.55,0.65,30,20,20,2.533e-3,1.240e-3,0.480e-3,Ethoxide)
+Pintle = Injector_obj(
+    cfg['injector']['cd_ox'],
+    cfg['injector']['cd_fuel'],
+    cfg['injector']['cd_film'],
+    cfg['injector']['angle_ox'],
+    cfg['injector']['angle_fuel'],
+    cfg['injector']['angle_film'],
+    cfg['injector']['area_ox'],
+    cfg['injector']['area_fuel'],
+    cfg['injector']['area_film'],
+    Ethoxide
+)
 
-mdotcoolinput = 0.81
+mdotcoolinput = cfg['mass_flow']['coolant']
 
+simtime = cfg['simulation']['time']
 
-
-simtime = 25 #seconds
-
-numsteps = 300
+numsteps = cfg['simulation']['num_steps']
 
 dt = simtime/numsteps
 
 timevec = np.linspace(0,simtime,numsteps)
 
-m1 = 53.3438 #kg (approx)
+m1 = cfg['initial_conditions']['tank_mass']
 
-dP_piston_psi = 15 
+dP_piston_psi = cfg['initial_conditions']['piston_pressure_drop_psi']
 
-T_init = 290 #K
+T_init = cfg['initial_conditions']['tank_temperature']
 
-massratio_target = 3.2
+massratio_target = cfg['mass_flow']['mass_ratio_target']
 
-mdot_target = 3.40194 #kg/s
+mdot_target = cfg['mass_flow']['total_target']
 
 ###########################################
 
 ######## PROPULSION INPUTS ################
 
-C = CEA_Obj(oxName='N2O', fuelName='ETHANOL')
+C = CEA_Obj(oxName=cfg['propellants']['oxidizer'], fuelName=cfg['propellants']['fuel'])
 
-plotchannel = True
-
-
-
+plotchannel = cfg['visualization']['plot_contour']
 
 coolant = Ethoxide.fuel
 
-Engine_name = 'Altair'
+Engine_name = cfg['output']['engine_name']
 
-Tc_init = 170 #K
+Tc_init = cfg['initial_conditions']['chamber_temperature']
 
-numpts = 20000
+numpts = cfg['visualization']['num_points']
 
-
-Dt = 52.77 #throat diameter in mm
-De = 111.04 #exit diameter in mm
+Dt = cfg['nozzle']['throat_diameter']
+De = cfg['nozzle']['exit_diameter']
 
 eps = (De**2)/(Dt**2)
 
-
-### THESE DIMENSIONS ARE IN INCHES 
+### THESE DIMENSIONS ARE IN INCHES
 
 _in2m = 1 / 39.3700787
 
-Lnozzle = 4.19*_in2m
-Lcon1 = 0.367*_in2m
-Lcon2 = 2.912*_in2m
-Lcham = 4.841*_in2m
+Lnozzle = cfg['nozzle']['length_nozzle']*_in2m
+Lcon1 = cfg['nozzle']['length_converging1']*_in2m
+Lcon2 = cfg['nozzle']['length_converging2']*_in2m
+Lcham = cfg['nozzle']['length_chamber']*_in2m
 
 Le = Lnozzle + Lcon1 + Lcon2 + Lcham
 
-expansionangle = 15 #degrees
-    
-Rc1 = 0.589*_in2m #radius of con1 arc
-Rc2 = 4.678*_in2m #radius of con2 arc
-    
-Rcham = 2.17*_in2m #combustion chamber radius
-    
-Rexit = 2.13*_in2m
+expansionangle = cfg['nozzle']['expansion_angle']
+
+Rc1 = cfg['nozzle']['radius_curvature1']*_in2m
+Rc2 = cfg['nozzle']['radius_curvature2']*_in2m
+
+Rcham = cfg['nozzle']['radius_chamber']*_in2m
+
+Rexit = cfg['nozzle']['radius_exit']*_in2m
 
 #### GEOM ARRAY
 
@@ -134,19 +146,19 @@ geom = np.array(geominches)
 
 #### RPA/CEA
 
-R_spec = 0.3597*1000 #J/kg*K
+R_spec = cfg['thermodynamics']['specific_gas_constant']
 
-gamma = 1.226
+gamma = cfg['thermodynamics']['specific_heat_ratio']
 
-Tc = 2641.5 #K
+Tc = cfg['thermodynamics']['combustion_temperature']
 
-A_t = 0.25*pi*((52.01/1000)**2) #throat area in m^2
+A_t = 0.25*pi*((Dt/1000)**2)  # throat area in m^2
 
-A_e = 0.25*pi*((108.29/1000)**2)
+A_e = 0.25*pi*((De/1000)**2)
 
-P_amb = 14.7*6895*0.8 # Ambient pressure
+P_amb = 14.7*6895*cfg['thermodynamics']['ambient_pressure_atm']  # Ambient pressure
 
-Rthroat = Dt/(2*1000) #throat radius in m
+Rthroat = Dt/(2*1000)  # throat radius in m
 
 
 def R(z):
@@ -198,7 +210,20 @@ def R(z):
     return R
 
 
-Altair = Regen_obj(1.5e-3,1e-3,1.5e-3,R,Rthroat,0.0254,90,Ethoxide.fuel,110,15e-6,80,Le)
+Altair = Regen_obj(
+    cfg['regen_cooling']['wall_thickness'],
+    cfg['regen_cooling']['channel_floor_height'],
+    cfg['regen_cooling']['min_channel_width'],
+    R,
+    Rthroat,
+    cfg['regen_cooling']['throat_radius_curvature'],
+    cfg['regen_cooling']['num_channels'],
+    Ethoxide.fuel,
+    cfg['regen_cooling']['num_points_z'],
+    cfg['regen_cooling']['channel_roughness'],
+    cfg['regen_cooling']['engine_length'],
+    Le
+)
 
 ######################################
 
@@ -219,11 +244,11 @@ for i in range(numpts):
 
 plt.figure(figsize=(8,4))
 
-nozzlecolor = 'steelblue'
+nozzlecolor = cfg['visualization']['nozzle_color']
 
-contournumber = 7
+contournumber = cfg['visualization']['contour_lines']
 
-gridnumber = 15
+gridnumber = cfg['visualization']['grid_lines']
 
 plt.plot(z,zout,color=nozzlecolor)
 plt.plot(z,-zout,color=nozzlecolor)
@@ -258,15 +283,14 @@ plt.show()
 z = z/39.3700787
 
 
-Channelwise_Engine_Length = 0.3
-numpts_axial = 5000  # number of interpolation points
+Channelwise_Engine_Length = cfg['regen_cooling']['channelwise_length']
+numpts_axial = cfg['regen_cooling']['num_points_axial']
 dz = Channelwise_Engine_Length / numpts_axial
-epsilon = 1e-3
-plot = True
-
+epsilon = cfg['regen_cooling']['convergence_epsilon']
+plot = cfg['visualization']['plot_contour']
 
 # THRUST CHAMBER MATERIAL PROPERTIES
-Chamber_k = 350  # Chamber material thermal conductivity in W/(m*K)
+Chamber_k = cfg['materials']['chamber_conductivity']
 
 
 
@@ -496,7 +520,7 @@ def rootT2(T2,v2,u2,Pressurant):
 ######################################
 
 
-Pc_init = 340*6895 #psi
+Pc_init = cfg['initial_conditions']['chamber_pressure_psi']*6895  # psi to Pa
 
 def CATNAP(Tinit, mdotox, mdotf, mdotfilm, x1, dt, m1,
            Regen_obj, Injector_obj, Props_obj,
@@ -807,10 +831,28 @@ def CATNAP(Tinit, mdotox, mdotf, mdotfilm, x1, dt, m1,
 
 
 (Pc_arr, P2_arr, T2_arr, x2_arr, F_arr, Isp_arr, mdot_arr, massratio_arr,
- regen_times, Tcool_3d, Pcool_3d, hg_3d, Twall_3d, Qflux_3d,transport_3d,tempsC_3d) = CATNAP(290,2.548,0.784,0.118,0.01,dt,54,Altair,Pintle,Ethoxide,regen_times=np.linspace(0.5,18,7),         
-                                                                                                        mdot_coolant=mdotcoolinput,     
-                                                                                                        Tcool_init=290, Pcool_init=3.7921e6, 
-                                                                                                        regen=True, plot=True)
+ regen_times, Tcool_3d, Pcool_3d, hg_3d, Twall_3d, Qflux_3d, transport_3d, tempsC_3d) = CATNAP(
+    cfg['initial_conditions']['tank_temperature'],
+    cfg['mass_flow']['oxidizer'],
+    cfg['mass_flow']['fuel'],
+    cfg['mass_flow']['film_cooling'],
+    cfg['initial_conditions']['vapor_mass_fraction'],
+    dt,
+    cfg['initial_conditions']['tank_mass'],
+    Altair,
+    Pintle,
+    Ethoxide,
+    regen_times=np.linspace(
+        cfg['regen_cooling']['regen_time_start'],
+        cfg['regen_cooling']['regen_time_end'],
+        cfg['regen_cooling']['regen_time_points']
+    ),
+    mdot_coolant=mdotcoolinput,
+    Tcool_init=cfg['coolant']['init_temperature'],
+    Pcool_init=cfg['coolant']['init_pressure'],
+    regen=True,
+    plot=cfg['visualization']['plot_contour']
+)
 
 
     
@@ -848,13 +890,16 @@ regen_results = {
 }
 
 # Inject data into dashboard and write self-contained HTML
-with open('catnap_dashboard.html', 'r') as f:
+dashboard_template = cfg['output']['dashboard_template']
+dashboard_output = cfg['output']['dashboard_output']
+
+with open(dashboard_template, 'r') as f:
     html = f.read()
 
 inject = '<script>var AUTOLOAD = ' + json.dumps(regen_results) + ';</script>'
 html = html.replace('</head>', inject + '\n</head>')
 
-output_path = os.path.abspath('catnap_results.html')
+output_path = os.path.abspath(dashboard_output)
 with open(output_path, 'w') as f:
     f.write(html)
 
