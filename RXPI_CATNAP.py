@@ -47,13 +47,13 @@ from numba import njit
 #### LOAD CONFIGURATION ####
 # Handle both script execution and PyInstaller frozen exe
 if getattr(sys, 'frozen', False):
-    # Running as PyInstaller exe - config.toml should be next to the exe
-    config_path = Path(sys.executable).parent / "config.toml"
+    # Running as PyInstaller exe - files should be next to the exe
+    base_path = Path(sys.executable).parent
 else:
     # Running as script
-    config_path = Path(__file__).parent / "config.toml"
+    base_path = Path(__file__).parent
 
-with open(config_path, "rb") as f:
+with open(base_path / "config.toml", "rb") as f:
     cfg = tomllib.load(f)
 
 #### CATNAP functions
@@ -898,8 +898,8 @@ regen_results = {
 }
 
 # Inject data into dashboard and write self-contained HTML
-dashboard_template = cfg['output']['dashboard_template']
-dashboard_output = cfg['output']['dashboard_output']
+dashboard_template = base_path / cfg['output']['dashboard_template']
+dashboard_output = base_path / cfg['output']['dashboard_output']
 
 with open(dashboard_template, 'r') as f:
     html = f.read()
@@ -907,7 +907,7 @@ with open(dashboard_template, 'r') as f:
 inject = '<script>var AUTOLOAD = ' + json.dumps(regen_results) + ';</script>'
 html = html.replace('</head>', inject + '\n</head>')
 
-output_path = os.path.abspath(dashboard_output)
+output_path = str(dashboard_output.resolve())
 with open(output_path, 'w') as f:
     f.write(html)
 
