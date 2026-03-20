@@ -39,12 +39,20 @@ from math import pi, tan
 from scipy.optimize import brentq
 from scipy.optimize import root
 import tomllib
+import sys
 from pathlib import Path
 
 from numba import njit
 
 #### LOAD CONFIGURATION ####
-config_path = Path(__file__).parent / "config.toml"
+# Handle both script execution and PyInstaller frozen exe
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller exe - config.toml should be next to the exe
+    config_path = Path(sys.executable).parent / "config.toml"
+else:
+    # Running as script
+    config_path = Path(__file__).parent / "config.toml"
+
 with open(config_path, "rb") as f:
     cfg = tomllib.load(f)
 
