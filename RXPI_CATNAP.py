@@ -47,11 +47,15 @@ from numba import njit
 #### LOAD CONFIGURATION ####
 # Handle both script execution and PyInstaller frozen exe
 if getattr(sys, 'frozen', False):
-    # Running as PyInstaller exe - files should be next to the exe
+    # Running as PyInstaller exe
+    # Config should be next to the exe (user-editable)
     base_path = Path(sys.executable).parent
+    # Bundled assets are in the temp extraction folder
+    bundle_path = Path(sys._MEIPASS)
 else:
     # Running as script
     base_path = Path(__file__).parent
+    bundle_path = base_path
 
 with open(base_path / "config.toml", "rb") as f:
     cfg = tomllib.load(f)
@@ -898,7 +902,7 @@ regen_results = {
 }
 
 # Inject data into dashboard and write self-contained HTML
-dashboard_template = base_path / cfg['output']['dashboard_template']
+dashboard_template = bundle_path / cfg['output']['dashboard_template']
 dashboard_output = base_path / cfg['output']['dashboard_output']
 
 with open(dashboard_template, 'r') as f:

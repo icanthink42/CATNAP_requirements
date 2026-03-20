@@ -31,6 +31,7 @@ jobs:
           --collect-all rocketcea
           --collect-all CoolProp
           --hidden-import=numba
+          --add-data "catnap_dashboard.html;."
           RXPI_CATNAP.py
 
       - name: Upload artifact
